@@ -252,6 +252,33 @@ if __name__=="__main__":
             for xx, rr in zip(xy,r):
                 fo.write(f'cylinder= {xx[0]:.2f}  {xx[1]:.2f}  {rr:.2f}\n')
 
+        # generate slurm run script
+        if gen_slm:
+            fo_name = outdir + '/job.slm'
+            with open(fo_name, 'w') as fo:
+                fo.write('#!/bin/tcsh\n')
+                fo.write(f'#SBATCH --partition={partition}\n')
+                fo.write(f'#SBATCH --time={simtime:02d}:00:00\n')
+                fo.write(f'#SBATCH --nodes={nnodes}\n')
+                fo.write('#SBATCH --no-requeue\n')
+                fo.write('#SBATCH --export=NONE\n\n')
+                fo.write(f'setenv OMP_NUM_THREADS {24*nnodes}\n\n')
+                fo.write('set edip = /home/nigel/carbon/edip/2021/edip\n\n')
+                fo.write('# Quenching Calculation\n')
+                fo.write('/bin/cp START START_orig\n')
+                fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Quench > out\n')
+                fo.write('/bin/cp ovito.xyz quench.xyz\n')
+                fo.write('/bin/cp out out-quench\n')
+                fo.write('# Annealing Calculation (breaking z-PBC)\n')
+                fo.write('set natom = `head -1 ovito.xyz`\n')
+                fo.write('printf  "$natom\\n100.0 100.0 50.0\\n" > START\n')
+                fo.write('tail -$natom ovito.xyz | awk \'{print $3,$4,$5}\' >> START\n\n')
+                fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Anneal > out\n')
+
+        # finally, tar the directory
+        shutil.make_archive(outdir, 'gztar', outdir)
+        shutil.rmtree(outdir)
+
     else:
         print('Failed cylinder fit :(')
         if not noplots:
@@ -261,31 +288,5 @@ if __name__=="__main__":
             ax.set_aspect('equal')
             for i in range(n):
                 ax.add_patch(plt.Circle((xy[i]), radius=r[i]))
-            fig.savefig(outdir + '/failed_holes.pdf')
-
-    # generate slurm run script
-    if gen_slm:
-        fo_name = outdir + '/job.slm'
-        with open(fo_name, 'w') as fo:
-            fo.write('#!/bin/tcsh\n')
-            fo.write(f'#SBATCH --partition={partition}\n')
-            fo.write(f'#SBATCH --time={simtime:02d}:00:00\n')
-            fo.write(f'#SBATCH --nodes={nnodes}\n')
-            fo.write('#SBATCH --no-requeue\n')
-            fo.write('#SBATCH --export=NONE\n\n')
-            fo.write(f'setenv OMP_NUM_THREADS {24*nnodes}\n\n')
-            fo.write('set edip = /home/nigel/carbon/edip/2021/edip\n\n')
-            fo.write('# Quenching Calculation\n')
-            fo.write('/bin/cp START START_orig\n')
-            fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Quench > out\n')
-            fo.write('/bin/cp ovito.xyz quench.xyz\n')
-            fo.write('/bin/cp out out-quench\n')
-            fo.write('# Annealing Calculation (breaking z-PBC)\n')
-            fo.write('set natom = `head -1 ovito.xyz`\n')
-            fo.write('printf  "$natom\\n100.0 100.0 50.0\\n" > START\n')
-            fo.write('tail -$natom ovito.xyz | awk \'{print $3,$4,$5}\' >> START\n\n')
-            fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Anneal > out\n')
-
-    # finally, tar up the created directory
-    shutil.make_archive(outdir, 'gztar', outdir)
-    shutil.rmtree(outdir)
+            fig.savefig('failed_holes.pdf')
+        shutil.rmtree(outdir)
