@@ -199,6 +199,14 @@ if __name__=="__main__":
         apos += box*0.5
         xy += l*0.5
 
+        # volumes
+        vol = np.prod(box) * 1e-24 # cc
+        cyl_vol = np.sum(np.pi*r**2) * 1e-24 # cc
+        avail_vol = vol - cyl_vol
+        atom_mass = natoms * 1.9945e-23 # grams
+        total_density = atom_mass / vol
+        allowed_area_density = atom_mass / avail_vol
+
         # make some plots if you want
         if not noplots:
             fig, ax = plt.subplots()
@@ -245,12 +253,66 @@ if __name__=="__main__":
                 fo.write(f'#{a}= {getattr(args, a)}\n')
             fo.write('#====================#\n')
             fo.write(f'#number_holes= {n}\n')
-            fo.write(f'#separation= {sep}\n')
+            fo.write(f'#separation= {sep} Å\n')
             fo.write(f'#hole_fraction= {np.pi*(r**2).sum()/(l**2):.2f}\n')
-            fo.write(f'#average_diameter= {r.mean()*2.:.2f}\n')
+            fo.write(f'#average_diameter= {r.mean()*2.:.2f} Å\n')
+            fo.write('#====================#\n')
+            fo.write(f'#cell_area= {np.prod(box[:-1]):.3f} Å^2\n')
+            fo.write(f'#total_density= {total_density:.3f} g/cc\n')
+            fo.write(f'#allowed_area_density= {allowed_area_density:.3f} g/cc\n')
             fo.write('#====================#\n')
             for xx, rr in zip(xy,r):
                 fo.write(f'cylinder= {xx[0]:.2f}  {xx[1]:.2f}  {rr:.2f}\n')
+
+        # generate quench script for edip
+        fo_name = outdir + '/In.Quench'
+        with open(fo_name, 'w') as fo:
+			fo.write('#include=In.Params\n')
+			fo.write('\n')
+			fo.write('nprint= 100\n')
+			fo.write('nsnap=  1000\n')
+			fo.write('ntakof=  0\n')
+			fo.write('\n')
+			fo.write('# (1) NVE for 3ps to allow melting\n')
+			fo.write('# (2) NVT for 3ps at 300K\n')
+			fo.write('\n')
+			fo.write('run;  h=0.01  ; nstep=  8500 ; temp= 0   ; therm=0 ; gr=1 ; msd=1\n')
+			fo.write('run;  h=0.01  ; nstep= 14200 ; temp= 300 ; therm=1 ; gr=1 ; msd=1\n')
+			fo.write('\n')
+			fo.write('cellneighbour\n')
+			fo.write('temp_start= 300\n')
+			fo.write('\n')
+			fo.write('ovito\n')
+			fo.write('xbspbc\n')
+
+        # generate anneal script for edip
+        fo_name = outdir + '/In.Anneal'
+        with open(fo_name, 'w') as fo:
+            fo.write('#include=In.Params\n\n')
+            fo.write('nprint= 100\n')
+            fo.write('nsnap=  1000\n')
+            fo.write('ntakof=  0\n\n')
+            fo.write('# (1) NVT for 3ps at 300K to allow surface to relax\n')
+            fo.write('# (2) NVT for 10ps in a gradual ramp to 3000K\n')
+            fo.write('# (3) NVT for 200ps at 3000K\n\n')
+            fo.write('run;  h=0.01  ; nstep=   8500 ; temp=  300 ; therm=1 ; gr=1 ; msd=1\n')
+            fo.write('run;  h=0.01  ; nstep=  28400 ; temp= 3000 ; therm=2 ; gr=1 ; msd=1\n')
+            fo.write('run;  h=0.01  ; nstep= 566500 ; temp= 3000 ; therm=1 ; gr=1 ; msd=1\n\n')
+            fo.write('cellneighbour\n')
+            fo.write('temp_start= 300\n\n')
+            fo.write('ovito\n')
+            fo.write('xbspbc\n')
+
+        fo_name = outdir + '/In.Params'
+        with open(fo_name, 'w') as fo:
+            fo.write('gamma=1.35419222406125\n')
+            fo.write('xlam=66.5\n')
+            fo.write('xmu=0.30 ; zrep=0.06 ; zrep2=0.06\n')
+            fo.write('flow=1.48  ; fhigh=2.000 ; falpha=1.544\n')
+            fo.write('zlow=1.547 ; zhigh=2.270 ; zalpha=1.544\n')
+            fo.write('bondcutoff=1.85\n')
+            fo.write('\n')
+            fo.write('norings\n')
 
         # generate slurm run script
         if gen_slm:
@@ -271,7 +333,7 @@ if __name__=="__main__":
                 fo.write('/bin/cp out out-quench\n')
                 fo.write('# Annealing Calculation (breaking z-PBC)\n')
                 fo.write('set natom = `head -1 ovito.xyz`\n')
-                fo.write('printf  "$natom\\n100.0 100.0 50.0\\n" > START\n')
+                fo.write(f'printf  "$natom\\n{box[0]} {box[1]} {box[2]+40}\\n" > START\n')
                 fo.write('tail -$natom ovito.xyz | awk \'{print $3,$4,$5}\' >> START\n\n')
                 fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Anneal > out\n')
 
