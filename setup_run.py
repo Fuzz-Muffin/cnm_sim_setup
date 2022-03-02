@@ -49,6 +49,7 @@ if __name__=="__main__":
     parser.add_argument('--simtime', default=24, type=int, help='Simulation runtime in hours')
     parser.add_argument('--nnodes', default=1, type=int, help='Number of nodes')
     parser.add_argument('--outdir', default='heat_and_anneal', type=str, help='Name of simulation directory')
+    parser.add_argument('--compress', default=False, action='store_true',help='Create tarball containing resultant simulation files, original directory will be deleted')
 
     # parse input and assign variables
     args = parser.parse_args()
@@ -63,6 +64,7 @@ if __name__=="__main__":
     mean_poresize = args.mean_poresize
     std = args.std
     debug = args.debug
+    compress = args.compress
     noplots = args.noplots
     gen_slm = args.gen_slm
     partition = args.partition
@@ -71,14 +73,14 @@ if __name__=="__main__":
     outdir = args.outdir
 
     # first check if outdirname already exists and add a number if so
-    if os.path.exists(outdir + '.tar.gz'):
+    if os.path.exists(outdir + '.tar.gz') or os.path.isdir(outdir):
         outdir_base = outdir
         for i in range(1,101):
             outdir = outdir_base + f'_{i}'
-            if not os.path.exists(outdir + '.tar.gz'):
+            if (not os.path.exists(outdir + '.tar.gz')) and (not os.path.isdir(outdir)):
                 break
-            elif os.path.exists(outdir + '.tar.gz') and i >=100:
-                sys.exit()
+            elif (os.path.exists(outdir + '.tar.gz')) and (os.path.isdir(outdir)) and (i >=100):
+                sys.exit('Failed to create directory')
     os.mkdir(outdir)
     print(f'Make directory {outdir}')
 
@@ -186,7 +188,7 @@ if __name__=="__main__":
                         try_pos -= box * np.round(try_pos/box)
 
             if ((not cyl_overlap) and (not atom_overlap)):
-                print(f'atom {i} fit')
+                print(f'atom {i+1} fit')
                 apos.append(try_pos)
 
         if len(apos) == natoms:
@@ -338,8 +340,9 @@ if __name__=="__main__":
                 fo.write(f'srun -n 1 -c {24*nnodes} $edip In.Anneal > out\n')
 
         # finally, tar the directory
-        shutil.make_archive(outdir, 'gztar', outdir)
-        shutil.rmtree(outdir)
+        if compress:
+            shutil.make_archive(outdir, 'gztar', outdir)
+            shutil.rmtree(outdir)
 
     else:
         print('Failed cylinder fit :(')
