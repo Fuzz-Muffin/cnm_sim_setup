@@ -270,6 +270,7 @@ if __name__=="__main__":
         fo_name = outdir + '/In.Quench'
         with open(fo_name, 'w') as fo:
             fo.write('#include=In.Params\n')
+            fo.write('#include=In.Holes\n')
             fo.write('\n')
             fo.write('nprint= 100\n')
             fo.write('nsnap=  1000\n')
@@ -290,7 +291,9 @@ if __name__=="__main__":
         # generate anneal script for edip
         fo_name = outdir + '/In.Anneal'
         with open(fo_name, 'w') as fo:
-            fo.write('#include=In.Params\n\n')
+            fo.write('#include=In.Params\n')
+            fo.write('#include=In.Holes\n\n')
+            fo.write('temp_start= 300\n\n')
             fo.write('nprint= 100\n')
             fo.write('nsnap=  1000\n')
             fo.write('ntakof=  0\n\n')
@@ -301,7 +304,6 @@ if __name__=="__main__":
             fo.write('run;  h=0.01  ; nstep=  28400 ; temp= 3000 ; therm=2 ; gr=1 ; msd=1\n')
             fo.write('run;  h=0.01  ; nstep= 566500 ; temp= 3000 ; therm=1 ; gr=1 ; msd=1\n\n')
             fo.write('cellneighbour\n')
-            fo.write('temp_start= 300\n\n')
             fo.write('#include=In.Holes\n')
             fo.write('ovito\n')
             fo.write('xbspbc\n')
