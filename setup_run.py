@@ -304,7 +304,6 @@ if __name__=="__main__":
             fo.write('run;  h=0.01  ; nstep=  28400 ; temp= 3000 ; therm=2 ; gr=1 ; msd=1\n')
             fo.write('run;  h=0.01  ; nstep= 566500 ; temp= 3000 ; therm=1 ; gr=1 ; msd=1\n\n')
             fo.write('cellneighbour\n')
-            fo.write('#include=In.Holes\n')
             fo.write('ovito\n')
             fo.write('xbspbc\n')
 
